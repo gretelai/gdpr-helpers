@@ -1,0 +1,86 @@
+schema_version: "1.0"
+name: "gdpr-transforms"
+models:
+  - transforms:
+      data_source: "_"
+      use_nlp: False
+      policies:
+        - name: deidentify_pii
+          rules:
+            - name: city
+              conditions:
+                field_name_regex:
+                  - '(?i)^((city|metropolitan|metro)[\ ,-,_,\.]*(name|area)|city|cities|town|township|capital|municipality|city\/town|town\/city)[s,es,\(s\),:,-]*$'
+              transforms:
+                - type: passthrough
+            - name: state
+              conditions:
+                field_name_regex:
+                  - '(?i)^(state|province|state\/province|province\/state)[s,es,\(s\),:,-]*$'
+              transforms:
+                - type: passthrough
+            - name: country
+              conditions:
+                field_name_regex:
+                  - '(?i)^(country[\/\ ,-,_,\.]*(name|region|territory)|country|countries)[s,\(s\),:,-]*$'
+              transforms:
+                - type: passthrough            
+            - name: last_name
+              conditions:
+                field_name_regex:
+                  - '(?i)^((last|family)[\ ,-,_,\.]*name|lname|surname|last|byname)[s,\(s\),:,-]*$'
+              transforms:
+                - type: redact_with_char
+                  attrs:
+                    char: L
+            - name: first_name
+              conditions:
+                field_name_regex:
+                  - '(?i)^((first|nick|given|middle)[\ ,-,_,\.]*name|fname|given|first|middle)[s,\(s\),:,-]*$'
+              transforms:
+                - type: redact_with_char
+                  attrs:
+                    char: F
+            - name: street_address
+              conditions:
+                field_name_regex:
+                  - '(?i)^((street|home|business)[\,-,_,\.]*address|street|address|headquarters|home|residence)[s,es,\(s\),:,-]*$'
+              transforms:
+                - type: redact_with_char
+                  attrs:
+                    char: S
+            - name: fake_or_redact_pii
+              conditions:
+                value_label:
+                  - person_name
+                  - credit_card_number
+                  - phone_number
+                  - phone_number_namer
+                  - us_social_security_number
+                  - email_address
+                  - ip_address
+                  - credit_card_number
+                  - imei_hardware_id
+                  - imsi_subscriber_id
+              transforms:
+                - type: fake
+                - type: redact_with_char
+                  attrs:
+                    char: X
+        - name: hash_ids
+          rules:
+            - name: hash_ids
+              conditions:
+                field_name_regex:
+                  - '(?i)^.*[ _.-]id$'
+                field_name:
+                  - id
+                value_label:
+                  - uuid
+                  - md5
+                  - sha256
+                  - sha512
+                field_attributes:
+                  is_id: true
+              transforms:
+                - type: hash
