@@ -14,6 +14,7 @@ from gretel_client.projects.models import read_model_config
 
 PREVIEW_RECS = 10
 
+
 class Anonymizer:
     """Automated model training and synthetic data generation tool
     Args:
@@ -27,7 +28,7 @@ class Anonymizer:
         tx_config: str = "./config/transform_config.yaml",
         run_mode: str = "cloud",
         output_dir: str = "artifacts",
-        preview_recs: int = PREVIEW_RECS
+        preview_recs: int = PREVIEW_RECS,
     ):
         configure_session(api_key="prompt", cache="yes", validate=True)
 
@@ -38,14 +39,14 @@ class Anonymizer:
         self.output_dir = Path(output_dir)
 
         self.project = create_or_get_unique_project(name=project_name)
-        self.training_path = Path(self.output_dir / 'training_data.csv')
-        self.anonymized_path = Path(self.output_dir / 'synthetic_data.csv')
-        self.preview_path = Path(self.output_dir / 'tmp-preview.csv')
-        self.deid_path = Path(self.output_dir / 'deidentified_data.csv')
-        self.deid_report_path = Path(self.output_dir / 'deidentification_report.md')
-        self._cache_init_report = Path(self.output_dir / 'init_report.pkl')
-        self._cache_run_report = Path(self.output_dir / 'run_report.pkl')
-        self._cache_syn_report = Path(self.output_dir / 'syn_report.pkl')
+        self.training_path = Path(self.output_dir / "training_data.csv")
+        self.anonymized_path = Path(self.output_dir / "synthetic_data.csv")
+        self.preview_path = Path(self.output_dir / "tmp-preview.csv")
+        self.deid_path = Path(self.output_dir / "deidentified_data.csv")
+        self.deid_report_path = Path(self.output_dir / "deidentification_report.md")
+        self._cache_init_report = Path(self.output_dir / "init_report.pkl")
+        self._cache_run_report = Path(self.output_dir / "run_report.pkl")
+        self._cache_syn_report = Path(self.output_dir / "syn_report.pkl")
         self.dataset_path: Optional[Path] = None
         self.deid_df = None
         self.synthetic_df = None
@@ -65,7 +66,7 @@ class Anonymizer:
         self.transform()
         self.synthesize()
 
-    def _preprocess_data(self, ds: str) -> str: 
+    def _preprocess_data(self, ds: str) -> str:
         """Remove NaNs from input data before training model
 
         Args:
@@ -76,43 +77,42 @@ class Anonymizer:
         print(f"Warning: Found NaN values in training data columns: {nan_columns}")
         df = df.fillna("")
         df.to_csv(self.training_path, index=False)
-    
+
     def _transform_local(self):
         # Initialize transform model
-        df = pd.read_csv(self.dataset_path)
+        df = pd.read_csv(self.training_path)
         df.head(self.preview_recs).to_csv(self.preview_path, index=False)
         config = yaml.safe_load(self.tx_config)
         transform_train = self.project.create_model_obj(config, self.preview_path)
         run = submit_docker_local(
             transform_train,
             output_dir="tmp/",
-            )
+        )
         self.init_report = json.loads(open("tmp/report_json.json.gz").read())
 
         # Use model to transform records
-        transform_go = transform_train.create_record_handler_obj(data_source=self.dataset_path)
+        transform_go = transform_train.create_record_handler_obj(
+            data_source=self.training_path
+        )
         run = submit_docker_local(
-            transform_go, 
-            model_path="tmp/model.tar.gz", 
-            output_dir="tmp/"
-            )
+            transform_go, model_path="tmp/model.tar.gz", output_dir="tmp/"
+        )
         self.run_report = json.loads(open("tmp/report_json.json.gz").read())
         self.deid_df = pd.read_csv("tmp/data.gz")
         self.deid_df.to_csv(self.deid_path, index=False)
-    
+
     def _transform_cloud(self):
         # Initialize transform model
-        df = pd.read_csv(self.dataset_path)
+        df = pd.read_csv(self.training_path)
         config = yaml.safe_load(self.tx_config)
         model = self.project.create_model_obj(
-            config, 
-            data_source=df.head(self.preview_recs)
+            config, data_source=df.head(self.preview_recs)
         )
         model.submit_cloud()
         poll(model)
         with open(model.get_artifact_link("report_json")) as fh:
             self.init_report = json.loads(fh.read())
-        
+
         # Use model to transform records
         rh = model.create_record_handler_obj(data_source=df)
         rh.submit_cloud()
@@ -121,32 +121,31 @@ class Anonymizer:
             self.run_report = json.loads(fh.read())
         self.deid_df = pd.read_csv(rh.get_artifact_link("data"), compression="gzip")
         self.deid_df.to_csv(self.deid_path, index=False)
-    
+
     def _print_transform_report(self):
         report = self.run_report
         report_content = (
-            f"Transforms finished.\n"
+            "Transforms finished.\n"
             f"Processing time: {report['summary'][0]['value']} seconds\n"
             f"Record count: {report['summary'][1]['value']}\n"
-            f"\n"
-            f"Columns transformed via field header name\n"
+            "\n"
+            "Columns transformed via field header name\n"
             f"{pd.DataFrame(report['summary'][2]['value']).to_markdown(index = False)}\n"
-            f"\n"
-            f"Columns transformed via content classification\n"
+            "\n"
+            "Columns transformed via content classification\n"
             f"{pd.DataFrame(report['summary'][3]['value']).to_markdown(index = False)}\n"
-            f"\n"
+            "\n"
         )
-        with open(self.deid_report_path, 'w') as fh:
+        with open(self.deid_report_path, "w") as fh:
             fh.write(report_content)
         print(report_content)
 
     def transform(self):
-        """Initialize transform to de-identify dataset
-        """
+        """Initialize transform to de-identify dataset"""
 
         if self._cache_init_report.exists() and self._cache_run_report.exists():
-            self.init_report = pickle.load(open(self._cache_init_report, 'rb'))
-            self.run_report = pickle.load(open(self._cache_run_report, 'rb'))
+            self.init_report = pickle.load(open(self._cache_init_report, "rb"))
+            self.run_report = pickle.load(open(self._cache_run_report, "rb"))
             self.deid_df = pd.read_csv(self.deid_path)
         else:
             # Initialize transform model
@@ -155,8 +154,8 @@ class Anonymizer:
             elif self.run_mode == "local":
                 self._transform_local()
 
-            pickle.dump(self.init_report, open(self._cache_init_report, 'wb'))
-            pickle.dump(self.run_report, open(self._cache_run_report, 'wb'))
+            pickle.dump(self.init_report, open(self._cache_init_report, "wb"))
+            pickle.dump(self.run_report, open(self._cache_run_report, "wb"))
             self.deid_df.to_csv(self.deid_path, index=False)
 
         self._print_transform_report()
@@ -165,24 +164,25 @@ class Anonymizer:
         config = read_model_config("synthetics/tabular-actgan")
         config["models"][0]["actgan"]["generate"] = {"num_records": len(self.deid_df)}
         config["models"][0]["actgan"]["params"]["epochs"] = 100
-        model = self.project.create_model_obj(model_config=config, data_source=self.deid_path)
+        model = self.project.create_model_obj(
+            model_config=config, data_source=self.deid_path
+        )
         model.submit_cloud()
         poll(model)
-        self.synthetic_df = pd.read_csv(model.get_artifact_link("data_preview"), compression="gzip")
+        self.synthetic_df = pd.read_csv(
+            model.get_artifact_link("data_preview"), compression="gzip"
+        )
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         with open(model.get_artifact_link("report_json")) as fh:
             self.syn_report = json.loads(fh.read())
-            pickle.dump(self.syn_report, open(self._cache_syn_report, 'wb'))
+            pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
 
-    
     def _synthesize_local(self):
         pass
 
     def synthesize(self):
-        """Synthesize a dataset
-        """
+        """Synthesize a dataset"""
         if self.run_mode == "cloud":
             self._synthesize_cloud()
         elif self.run_mode == "local":
             self._synthesize_local()
-         
