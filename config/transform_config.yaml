@@ -51,7 +51,7 @@ models:
                     char: S
             - name: fake_or_redact_pii
               conditions:
-                value_label:
+                field_label:
                   - person_name
                   - credit_card_number
                   - phone_number
@@ -75,7 +75,7 @@ models:
                   - '(?i)^.*[ _.-]id$'
                 field_name:
                   - id
-                value_label:
+                field_label:
                   - uuid
                   - md5
                   - sha256
@@ -84,3 +84,11 @@ models:
                   is_id: true
               transforms:
                 - type: hash
+label_predictors:
+  namespace: gdpr
+  # If >= 80% of the values in a field / column
+  # match any single entity, classify the entire field / column
+  # with that label. When using `field_label` conditions over
+  # `field_value` conditions, which search each field, this
+  # can drastically speed up data transformation.
+  field_label_threshold: 0.80

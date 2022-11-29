@@ -1,18 +1,19 @@
-from collections import namedtuple
 import json
 import os
-import pandas as pd
-from path import Path
 import pickle
-from smart_open import open
-from typing import TYPE_CHECKING, Any
-import yaml
+from typing import TYPE_CHECKING, Optional
 
-from gretel_client import poll, configure_session, submit_docker_local
+import pandas as pd
+import yaml
+from pathlib import Path
+from smart_open import open
+
+from gretel_client import configure_session, poll, submit_docker_local
 from gretel_client.projects import create_or_get_unique_project
 from gretel_client.projects.models import read_model_config
 
-PREVIEW_RECS = 10
+
+PREVIEW_RECS = 100
 
 
 class Anonymizer:
@@ -59,15 +60,18 @@ class Anonymizer:
 
     def anonymize(self, dataset_path: str):
         """Anonymize a dataset to GDPR standards
+        using a pipeline of named entity recognition, data transformations,
+        and synthetic data model training and generation"
+
         Args:
             dataset_path (str): Path or URL to CSV
         """
         self._preprocess_data(dataset_path)
         self.transform()
-        self.synthesize()
+        # self.synthesize()
 
     def _preprocess_data(self, ds: str) -> str:
-        """Remove NaNs from input data before training model
+        """Remove NaNs from input data before training model.
 
         Args:
             ds (str): Path to source dataset
@@ -79,7 +83,7 @@ class Anonymizer:
         df.to_csv(self.training_path, index=False)
 
     def _transform_local(self):
-        # Initialize transform model
+        """Deidentify a dataset using Gretel's hybrid cloud API."""
         df = pd.read_csv(self.training_path)
         df.head(self.preview_recs).to_csv(self.preview_path, index=False)
         config = yaml.safe_load(self.tx_config)
@@ -102,7 +106,7 @@ class Anonymizer:
         self.deid_df.to_csv(self.deid_path, index=False)
 
     def _transform_cloud(self):
-        # Initialize transform model
+        """Deidentify a dataset using Gretel's SaaS API."""
         df = pd.read_csv(self.training_path)
         config = yaml.safe_load(self.tx_config)
         model = self.project.create_model_obj(
@@ -122,7 +126,32 @@ class Anonymizer:
         self.deid_df = pd.read_csv(rh.get_artifact_link("data"), compression="gzip")
         self.deid_df.to_csv(self.deid_path, index=False)
 
+    def _print_ner_report(self):
+        """Print a markdown-format report of the NER findings from a dataset."""
+        report = self.init_report
+        df = pd.DataFrame(report["metadata"]["fields"])[
+            ["name", "count", "approx_distinct_count", "missing_count", "labels"]
+        ]
+        df["labels"] = df["labels"].astype(str).replace("[\[\]']", "", regex=True)
+        df.rename(
+            columns={"labels": "entities_detected", "name": "column_name"}, inplace=True
+        )
+        report_content = (
+            "\n\nNamed Entity Recognition (NER) finished.\n"
+            f"Processing time: {report['training_time_seconds']} seconds\n"
+            f"Record count: {report['record_count']} records\n"
+            f"Column count: {report['field_count']} columns\n"
+            "\n"
+            "Dataset overview\n"
+            f"{df.to_markdown(index = False)}\n"
+            "\n"
+        )
+        with open(self.deid_report_path, "w") as fh:
+            fh.write(report_content)
+        print(report_content)
+
     def _print_transform_report(self):
+        """Print a markdown-format report of data transformations on a dataset."""
         report = self.run_report
         report_content = (
             "Transforms finished.\n"
@@ -132,16 +161,13 @@ class Anonymizer:
             "Columns transformed via field header name\n"
             f"{pd.DataFrame(report['summary'][2]['value']).to_markdown(index = False)}\n"
             "\n"
-            "Columns transformed via content classification\n"
-            f"{pd.DataFrame(report['summary'][3]['value']).to_markdown(index = False)}\n"
-            "\n"
         )
-        with open(self.deid_report_path, "w") as fh:
+        with open(self.deid_report_path, "a") as fh:
             fh.write(report_content)
         print(report_content)
 
     def transform(self):
-        """Initialize transform to de-identify dataset"""
+        """Deidentify a dataset using Gretel's Transform APIs."""
 
         if self._cache_init_report.exists() and self._cache_run_report.exists():
             self.init_report = pickle.load(open(self._cache_init_report, "rb"))
@@ -158,9 +184,12 @@ class Anonymizer:
             pickle.dump(self.run_report, open(self._cache_run_report, "wb"))
             self.deid_df.to_csv(self.deid_path, index=False)
 
+        self._print_ner_report()
         self._print_transform_report()
 
     def _synthesize_cloud(self):
+        """Train a synthetic data model on a dataset using Gretel's SaaS APIs.
+        """
         config = read_model_config("synthetics/tabular-actgan")
         config["models"][0]["actgan"]["generate"] = {"num_records": len(self.deid_df)}
         config["models"][0]["actgan"]["params"]["epochs"] = 100
@@ -178,10 +207,13 @@ class Anonymizer:
             pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
 
     def _synthesize_local(self):
+        """Train a synthetic data model on a dataset using Gretel's Hybrid Cloud APIs."""
         pass
 
     def synthesize(self):
-        """Synthesize a dataset"""
+        """Train a synthetic data model on a dataset and use it to create an artificial
+        version of a dataset with increased privacy guarantees.
+        """
         if self.run_mode == "cloud":
             self._synthesize_cloud()
         elif self.run_mode == "local":
