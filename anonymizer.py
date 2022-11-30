@@ -68,7 +68,7 @@ class Anonymizer:
         """
         self._preprocess_data(dataset_path)
         self.transform()
-        # self.synthesize()
+        self.synthesize()
 
     def _preprocess_data(self, ds: str) -> str:
         """Remove NaNs from input data before training model.
@@ -82,8 +82,8 @@ class Anonymizer:
         df = df.fillna("")
         df.to_csv(self.training_path, index=False)
 
-    def _transform_local(self):
-        """Deidentify a dataset using Gretel's hybrid cloud API."""
+    def _transform_hybrid(self):
+        """Gretel hybrid cloud API."""
         df = pd.read_csv(self.training_path)
         df.head(self.preview_recs).to_csv(self.preview_path, index=False)
         config = yaml.safe_load(self.tx_config)
@@ -106,7 +106,7 @@ class Anonymizer:
         self.deid_df.to_csv(self.deid_path, index=False)
 
     def _transform_cloud(self):
-        """Deidentify a dataset using Gretel's SaaS API."""
+        """Gretel SaaS API."""
         df = pd.read_csv(self.training_path)
         config = yaml.safe_load(self.tx_config)
         model = self.project.create_model_obj(
@@ -127,7 +127,7 @@ class Anonymizer:
         self.deid_df.to_csv(self.deid_path, index=False)
 
     def _print_ner_report(self):
-        """Print a markdown-format report of the NER findings from a dataset."""
+        """Save a markdown-format report of the NER findings from a dataset."""
         report = self.init_report
         df = pd.DataFrame(report["metadata"]["fields"])[
             ["name", "count", "approx_distinct_count", "missing_count", "labels"]
@@ -140,30 +140,43 @@ class Anonymizer:
             "\n\nNamed Entity Recognition (NER) finished.\n"
             f"Processing time: {report['training_time_seconds']} seconds\n"
             f"Record count: {report['record_count']} records\n"
-            f"Column count: {report['field_count']} columns\n"
-            "\n"
-            "Dataset overview\n"
-            f"{df.to_markdown(index = False)}\n"
-            "\n"
+            f"Column count: {report['field_count']} columns\n\n"
+            f"Dataset overview\n"
+            f"{df.to_markdown(index = False)}\n\n"
         )
         with open(self.deid_report_path, "w") as fh:
             fh.write(report_content)
         print(report_content)
 
     def _print_transform_report(self):
-        """Print a markdown-format report of data transformations on a dataset."""
+        """Save a markdown-format report of data transformations on a dataset."""
         report = self.run_report
         report_content = (
             "Transforms finished.\n"
             f"Processing time: {report['summary'][0]['value']} seconds\n"
-            f"Record count: {report['summary'][1]['value']}\n"
-            "\n"
-            "Columns transformed via field header name\n"
-            f"{pd.DataFrame(report['summary'][2]['value']).to_markdown(index = False)}\n"
-            "\n"
+            f"Record count: {report['summary'][1]['value']}\n\n"
+            f"Columns transformed\n"
+            f"{pd.DataFrame(report['summary'][2]['value']).to_markdown(index = False)}\n\n"
         )
         with open(self.deid_report_path, "a") as fh:
             fh.write(report_content)
+        print(report_content)
+
+    
+    def _print_synthesis_report(self):
+        """Save a markdown-format report of data synthesis on a dataset."""
+        report = self.syn_report
+        print(json.dumps(report, indent=2))
+        exit(0)
+        report_content = (
+            "Synthesis finished.\n"
+            f"Processing time: {report['summary'][0]['value']} seconds\n"
+            f"Record count: {report['summary'][1]['value']}\n\n"
+            f"Columns transformed\n"
+            f"{pd.DataFrame(report['summary'][2]['value']).to_markdown(index = False)}\n\n"
+        )
+        #with open(self.deid_report_path, "a") as fh:
+        #    fh.write(report_content)
         print(report_content)
 
     def transform(self):
@@ -177,8 +190,8 @@ class Anonymizer:
             # Initialize transform model
             if self.run_mode == "cloud":
                 self._transform_cloud()
-            elif self.run_mode == "local":
-                self._transform_local()
+            elif self.run_mode == "hybrid":
+                self._transform_hybrid()
 
             pickle.dump(self.init_report, open(self._cache_init_report, "wb"))
             pickle.dump(self.run_report, open(self._cache_run_report, "wb"))
@@ -187,8 +200,23 @@ class Anonymizer:
         self._print_ner_report()
         self._print_transform_report()
 
+    def synthesize(self):
+        """Train a synthetic data model on a dataset and use it to create an artificial
+        version of a dataset with increased privacy guarantees.
+        """
+        if self._cache_syn_report.exists():
+            self.syn_report = pickle.load(open(self._cache_syn_report, "rb"))
+            self.synthetic_df = pd.read_csv(self.anonymized_path)
+        else:
+            if self.run_mode == "cloud":
+                self._synthesize_cloud()
+            elif self.run_mode == "hybrid":
+                self._synthesize_hybrid()
+
+        #self._print_synthesis_report()
+
     def _synthesize_cloud(self):
-        """Train a synthetic data model on a dataset using Gretel's SaaS APIs.
+        """Gretel SaaS APIs.
         """
         config = read_model_config("synthetics/tabular-actgan")
         config["models"][0]["actgan"]["generate"] = {"num_records": len(self.deid_df)}
@@ -206,15 +234,17 @@ class Anonymizer:
             self.syn_report = json.loads(fh.read())
             pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
 
-    def _synthesize_local(self):
-        """Train a synthetic data model on a dataset using Gretel's Hybrid Cloud APIs."""
-        pass
+    def _synthesize_hybrid(self):
+        """Gretel Hybrid Cloud APIs"""
+        config = read_model_config("synthetics/tabular-actgan")
+        config["models"][0]["actgan"]["generate"] = {"num_records": len(self.deid_df)}
+        config["models"][0]["actgan"]["params"]["epochs"] = 100
+        config["models"][0]["actgan"]["data_source"] = str(self.training_path)
 
-    def synthesize(self):
-        """Train a synthetic data model on a dataset and use it to create an artificial
-        version of a dataset with increased privacy guarantees.
-        """
-        if self.run_mode == "cloud":
-            self._synthesize_cloud()
-        elif self.run_mode == "local":
-            self._synthesize_local()
+        model = self.project.create_model_obj(model_config=config)
+        run = submit_docker_local(model, output_dir="tmp/")
+
+        self.synthetic_df = pd.read_csv("tmp/data_preview.gz", compression="gzip")
+        self.synthetic_df.to_csv(self.anonymized_path, index=False)
+        self.syn_report = json.loads(open("tmp/report_json.json.gz").read())
+        pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
