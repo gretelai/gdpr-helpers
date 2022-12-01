@@ -84,6 +84,8 @@ models:
                   is_id: true
               transforms:
                 - type: hash
+                  attrs:
+                    length: 8
 label_predictors:
   namespace: gdpr
   # If >= 80% of the values in a field / column
