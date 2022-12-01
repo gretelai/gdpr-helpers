@@ -48,14 +48,15 @@ class Anonymizer:
         self.tmp_dir = Path(tmp_dir)
 
         self.project = create_or_get_unique_project(name=project_name)
-        self.deid_path = Path(self.output_dir / "deidentified_data.csv")
-        self.deid_report_path = Path(self.output_dir / "deidentification_report.md")
-        self.anonymized_path = Path(self.output_dir / "synthetic_data.csv")
+        self.deid_report_path = None
+        self.anonymized_path = None
+
         self.training_path = Path(self.tmp_dir / "training_data.csv")
+        self.deid_path = Path(self.tmp_dir / "deidentified_data.csv")
         self.preview_path = Path(self.tmp_dir / "preview.csv")
-        self._cache_ner_report = Path(self.tmp_dir / "ner_report.pkl")
-        self._cache_run_report = Path(self.tmp_dir / "run_report.pkl")
-        self._cache_syn_report = Path(self.tmp_dir / "syn_report.pkl")
+        self._cache_ner_report = None
+        self._cache_run_report = None 
+        self._cache_syn_report = None 
         self.dataset_path: Optional[Path] = None
         self.deid_df = None
         self.synthetic_df = None
@@ -79,6 +80,7 @@ class Anonymizer:
         Args:
             dataset_path (str): Path or URL to CSV
         """
+        print(f"Anonymizing '{dataset_path}'")
         self._preprocess_data(dataset_path)
         self.transform()
         self.synthesize()
@@ -109,6 +111,14 @@ class Anonymizer:
         print(f"Warning: Found NaN values in training data columns: {nan_columns}")
         df = df.fillna("")
         df.to_csv(self.training_path, index=False)
+
+        # Setup output paths
+        prefix = Path(ds).stem
+        self.deid_report_path = Path(self.output_dir / f"{prefix}-deidentification_report.md")
+        self.anonymized_path = Path(self.output_dir / f"{prefix}-synthetic_data.csv")
+        self._cache_ner_report = Path(self.tmp_dir / f"{prefix}-ner_report.pkl")
+        self._cache_run_report = Path(self.tmp_dir / f"{prefix}-run_report.pkl")
+        self._cache_syn_report = Path(self.tmp_dir / f"{prefix}-syn_report.pkl")
 
     def _transform_hybrid(self, config: dict):
         """Gretel hybrid cloud API."""
