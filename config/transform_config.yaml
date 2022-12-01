@@ -45,6 +45,14 @@ models:
                 - type: fake
                   attrs:
                     method: name_nonbinary
+            - name: middle_name
+              conditions:
+                field_name_regex:
+                  - '(?i)^((middle)[\ ,-,_,\.]*name|mname|middle|surname)[s,\(s\),:,-]*$'
+              transforms:
+                - type: fake
+                  attrs:
+                    method: name_nonbinary
             - name: first_name
               conditions:
                 field_name_regex:
@@ -56,11 +64,29 @@ models:
             - name: street_address
               conditions:
                 field_name_regex:
-                  - '(?i)^((street|home|business)[\,-,_,\.]*address|street|address|headquarters|home|residence)[s,es,\(s\),:,-]*$'
+                  - '(?i)^((street|home|business)[\,-,_,\.]*address|street|address|addressline|headquarters|home|residence)[1]{0,1}[s,es,\(s\),:,-]*$'
               transforms:
                 - type: fake
                   attrs:
                     method: street_address
+            - name: secondary_address
+              conditions:
+                field_name_regex:
+                  - '(?i)^((street|home|business)[\,-,_,\.]*address|street|address|addressline|headquarters|home|residence)2[s,es,\(s\),:,-]*$'
+              transforms:
+                - type: hash
+                  attrs:
+                    length: 2 
+            - name: birth_date
+              conditions:
+                field_label:
+                  - birth_date
+              transforms:
+                - type: dateshift
+                  attrs:
+                    min: 20
+                    max: 20
+                    formats: "%Y-%m-%d"
             - name: fake_or_redact_pii
               conditions:
                 field_label:
@@ -78,12 +104,21 @@ models:
                 - type: redact_with_char
                   attrs:
                     char: X
+            - name: hash_other_locations
+              conditions:
+                field_label:
+                  - location
+              transforms:
+                - type: hash
+                  attrs:
+                    length: 8
         - name: hash_ids
           rules:
             - name: hash_ids
               conditions:
                 field_name_regex:
                   - '(?i)^.*[ _.-]id$'
+                  - '^.*[a-z]{1}ID$'
                 field_name:
                   - id
                 field_label:
