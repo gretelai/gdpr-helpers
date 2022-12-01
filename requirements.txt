@@ -1,0 +1,3 @@
+gretel-client
+pandas
+smart-open
