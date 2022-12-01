@@ -1,8 +1,3 @@
-import json
-
-import pandas as pd
-from smart_open import open
-
 from anonymizer import Anonymizer
 
 
