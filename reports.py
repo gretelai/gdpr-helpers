@@ -1,5 +1,7 @@
 from pathlib import Path
+
 import pandas as pd
+
 
 def ner_report(report: dict) -> str:
     """Save a markdown-format report of the NER findings from a dataset."""
@@ -20,11 +22,12 @@ def ner_report(report: dict) -> str:
     )
     return content
 
+
 def transform_report(report: dict) -> str:
     """Save a markdown-format report of data transformations on a dataset."""
-    for item in report['summary']:
-        if item['field'] == 'field_transforms':
-            df = pd.DataFrame(item['value']) 
+    for item in report["summary"]:
+        if item["field"] == "field_transforms":
+            df = pd.DataFrame(item["value"])
 
     content = (
         "Transforms finished.\n"
@@ -35,7 +38,8 @@ def transform_report(report: dict) -> str:
     )
     return content
 
-def synthesis_report(report:dict) -> str:
+
+def synthesis_report(report: dict) -> str:
     """Save a markdown-format report of data synthesis on a dataset."""
     content = (
         f"\n\nSynthesis finished.\n"

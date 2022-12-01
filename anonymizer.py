@@ -1,11 +1,11 @@
 import json
 import os
 import pickle
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import pandas as pd
 import yaml
-from pathlib import Path
 from smart_open import open
 
 from gretel_client import configure_session, poll, submit_docker_local
@@ -60,7 +60,10 @@ class Anonymizer:
         self.run_report = {}
         self.syn_report = {}
 
-        assert self.run_mode in ['cloud', 'hybrid'], "Error: run_mode param must be either 'cloud' or 'hybrid"
+        assert self.run_mode in [
+            "cloud",
+            "hybrid",
+        ], "Error: run_mode param must be either 'cloud' or 'hybrid"
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -83,13 +86,14 @@ class Anonymizer:
         print("Anonymization complete")
         print(f" -- Synthetic data stored to: {self.anonymized_path}")
         print(f" -- Anonymization report stored to: {self.deid_report_path}")
-    
+
     def _save_reports(self, output_path: Path):
         """Save anonymization reports to a local file in markdown format
         """
-        report = (f"{reports.ner_report(self.ner_report)}"
-                  f"{reports.transform_report(self.run_report)}"
-                  f"{reports.synthesis_report(self.syn_report)}"
+        report = (
+            f"{reports.ner_report(self.ner_report)}"
+            f"{reports.transform_report(self.run_report)}"
+            f"{reports.synthesis_report(self.syn_report)}"
         )
         with open(self.deid_report_path, "w") as fh:
             fh.write(report)
@@ -106,15 +110,12 @@ class Anonymizer:
         df = df.fillna("")
         df.to_csv(self.training_path, index=False)
 
-    def _transform_hybrid(self, config:dict):
+    def _transform_hybrid(self, config: dict):
         """Gretel hybrid cloud API."""
         df = pd.read_csv(self.training_path)
         df.head(self.preview_recs).to_csv(self.preview_path, index=False)
         transform_train = self.project.create_model_obj(config, str(self.preview_path))
-        run = submit_docker_local(
-            transform_train,
-            output_dir=str(self.tmp_dir),
-        )
+        run = submit_docker_local(transform_train, output_dir=str(self.tmp_dir),)
         self.ner_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
 
         # Use model to transform records
@@ -122,20 +123,19 @@ class Anonymizer:
             data_source=str(self.training_path)
         )
         run = submit_docker_local(
-            transform_go, 
-            model_path=str(self.tmp_dir / "model.tar.gz"), 
-            output_dir=str(self.tmp_dir)
+            transform_go,
+            model_path=str(self.tmp_dir / "model.tar.gz"),
+            output_dir=str(self.tmp_dir),
         )
         self.run_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
         self.deid_df = pd.read_csv(self.tmp_dir / "data.gz")
         self.deid_df.to_csv(self.deid_path, index=False)
 
-    def _transform_cloud(self, config:dict):
+    def _transform_cloud(self, config: dict):
         """Gretel SaaS API."""
         df = pd.read_csv(self.training_path)
         model = self.project.create_model_obj(
-            config, 
-            data_source=df.head(self.preview_recs)
+            config, data_source=df.head(self.preview_recs)
         )
         model.submit_cloud()
         poll(model)
@@ -153,7 +153,7 @@ class Anonymizer:
 
     def transform(self):
         """Deidentify a dataset using Gretel's Transform APIs."""
-        with open(self.tx_config, 'r') as stream:
+        with open(self.tx_config, "r") as stream:
             config = yaml.safe_load(stream)
 
         if self._cache_ner_report.exists() and self._cache_run_report.exists():
@@ -178,7 +178,7 @@ class Anonymizer:
         """Train a synthetic data model on a dataset and use it to create an artificial
         version of a dataset with increased privacy guarantees.
         """
-        with open(self.sx_config, 'r') as stream:
+        with open(self.sx_config, "r") as stream:
             config = yaml.safe_load(stream)
 
         config["models"][0]["actgan"]["generate"] = {"num_records": len(self.deid_df)}
@@ -195,12 +195,11 @@ class Anonymizer:
 
         print(reports.synthesis_report(self.syn_report))
 
-    def _synthesize_cloud(self, config:dict):
+    def _synthesize_cloud(self, config: dict):
         """Gretel SaaS APIs.
         """
         model = self.project.create_model_obj(
-            model_config=config, 
-            data_source=str(self.deid_path)
+            model_config=config, data_source=str(self.deid_path)
         )
         model.submit_cloud()
         poll(model)
@@ -212,14 +211,13 @@ class Anonymizer:
             self.syn_report = json.loads(fh.read())
             pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
 
-    def _synthesize_hybrid(self, config:dict):
+    def _synthesize_hybrid(self, config: dict):
         """Gretel Hybrid Cloud APIs"""
         model = self.project.create_model_obj(model_config=config)
-        run = submit_docker_local(
-            model, 
-            output_dir=str(self.tmp_dir)
+        run = submit_docker_local(model, output_dir=str(self.tmp_dir))
+        self.synthetic_df = pd.read_csv(
+            self.tmp_dir / "data_preview.gz", compression="gzip"
         )
-        self.synthetic_df = pd.read_csv(self.tmp_dir / "data_preview.gz", compression="gzip")
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         self.syn_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
         pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
