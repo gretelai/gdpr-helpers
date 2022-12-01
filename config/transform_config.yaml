@@ -6,7 +6,19 @@ models:
       use_nlp: False
       policies:
         - name: deidentify_pii
+          transform_attrs:
+            locales:
+              - en_US
           rules:
+            - name: fake email
+              conditions:
+                field_label:
+                  - email_address
+              transforms:
+                - type: fake
+                  attrs:
+                    method: email
+                    params: {domain: foo.com}
             - name: city
               conditions:
                 field_name_regex:
@@ -30,25 +42,25 @@ models:
                 field_name_regex:
                   - '(?i)^((last|family)[\ ,-,_,\.]*name|lname|surname|last|byname)[s,\(s\),:,-]*$'
               transforms:
-                - type: redact_with_char
+                - type: fake
                   attrs:
-                    char: L
+                    method: name_nonbinary
             - name: first_name
               conditions:
                 field_name_regex:
                   - '(?i)^((first|nick|given|middle)[\ ,-,_,\.]*name|fname|given|first|middle)[s,\(s\),:,-]*$'
               transforms:
-                - type: redact_with_char
+                - type: fake
                   attrs:
-                    char: F
+                    method: first_name_nonbinary
             - name: street_address
               conditions:
                 field_name_regex:
                   - '(?i)^((street|home|business)[\,-,_,\.]*address|street|address|headquarters|home|residence)[s,es,\(s\),:,-]*$'
               transforms:
-                - type: redact_with_char
+                - type: fake
                   attrs:
-                    char: S
+                    method: street_address
             - name: fake_or_redact_pii
               conditions:
                 field_label:
@@ -57,7 +69,6 @@ models:
                   - phone_number
                   - phone_number_namer
                   - us_social_security_number
-                  - email_address
                   - ip_address
                   - credit_card_number
                   - imei_hardware_id

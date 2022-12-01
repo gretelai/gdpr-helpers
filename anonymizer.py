@@ -36,6 +36,7 @@ class Anonymizer:
         configure_session(api_key="prompt", cache="yes", validate=True)
 
         self.project_name = project_name
+        self.sx_config = sx_config
         self.tx_config = tx_config
         self.run_mode = run_mode
         self.preview_recs = preview_recs
@@ -100,7 +101,7 @@ class Anonymizer:
 
         # Use model to transform records
         transform_go = transform_train.create_record_handler_obj(
-            data_source=self.training_path
+            data_source=str(self.training_path)
         )
         run = submit_docker_local(
             transform_go, 
@@ -157,12 +158,16 @@ class Anonymizer:
     def _print_transform_report(self):
         """Save a markdown-format report of data transformations on a dataset."""
         report = self.run_report
+        for item in report['summary']:
+            if item['field'] == 'field_transforms':
+                df = pd.DataFrame(item['value']) 
+
         report_content = (
             "Transforms finished.\n"
             f"Processing time: {report['summary'][0]['value']} seconds\n"
             f"Record count: {report['summary'][1]['value']}\n\n"
             f"Columns transformed\n"
-            f"{pd.DataFrame(report['summary'][2]['value']).to_markdown(index = False)}\n\n"
+            f"{df.to_markdown(index = False)}\n\n"
         )
         with open(self.deid_report_path, "a") as fh:
             fh.write(report_content)
@@ -187,7 +192,8 @@ class Anonymizer:
 
     def transform(self):
         """Deidentify a dataset using Gretel's Transform APIs."""
-        config = yaml.safe_load(self.tx_config)
+        with open(self.tx_config, 'r') as stream:
+            config = yaml.safe_load(stream)
 
         if self._cache_init_report.exists() and self._cache_run_report.exists():
             self.init_report = pickle.load(open(self._cache_init_report, "rb"))
@@ -211,7 +217,9 @@ class Anonymizer:
         """Train a synthetic data model on a dataset and use it to create an artificial
         version of a dataset with increased privacy guarantees.
         """
-        config = yaml.safe_load(self.sx_config)
+        with open(self.sx_config, 'r') as stream:
+            config = yaml.safe_load(stream)
+
         config["models"][0]["actgan"]["generate"] = {"num_records": len(self.deid_df)}
         config["models"][0]["actgan"]["data_source"] = str(self.training_path)
 
