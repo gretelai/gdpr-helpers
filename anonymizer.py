@@ -103,7 +103,9 @@ class Anonymizer:
             data_source=self.training_path
         )
         run = submit_docker_local(
-            transform_go, model_path=self.tmp_dir / "model.tar.gz", output_dir=self.tmp_dir
+            transform_go, 
+            model_path=str(self.tmp_dir / "model.tar.gz"), 
+            output_dir=str(self.tmp_dir)
         )
         self.run_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
         self.deid_df = pd.read_csv(self.tmp_dir / "data.gz")
@@ -244,7 +246,10 @@ class Anonymizer:
     def _synthesize_hybrid(self, config:dict):
         """Gretel Hybrid Cloud APIs"""
         model = self.project.create_model_obj(model_config=config)
-        run = submit_docker_local(model, output_dir=str(self.tmp_dir))
+        run = submit_docker_local(
+            model, 
+            output_dir=str(self.tmp_dir)
+        )
 
         self.synthetic_df = pd.read_csv(self.tmp_dir / "data_preview.gz", compression="gzip")
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
