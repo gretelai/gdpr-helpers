@@ -1,11 +1,9 @@
 import json
-import os
 import pickle
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import pandas as pd
-import yaml
 from smart_open import open
 
 from gretel_client import configure_session, poll, submit_docker_local
@@ -20,8 +18,13 @@ PREVIEW_RECS = 100
 class Anonymizer:
     """Automated model training and synthetic data generation tool
     Args:
-        project_name (str, optional): Gretel project name. Defaults to "gdpr-anonymized".
-        overwrite (bool, optional): Overwrite previous progress. Defaults to True.
+        project_name: Gretel project name. Defaults to "gdpr-anonymized".
+        tx_config: Location of transform config. This can be a local path or URL that
+            will be accessible when running.
+        sx_config: Location of synthetics config. This can be a local path or URL that
+            will be accessible when running.
+        run_mode: One of ["cloud", "hybrid"].
+        preview_recs: Number of records to use for transforms training.
     """
 
     def __init__(
@@ -65,15 +68,13 @@ class Anonymizer:
             "hybrid",
         ], "Error: run_mode param must be either 'cloud' or 'hybrid"
 
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-        if not os.path.exists(self.tmp_dir):
-            os.makedirs(self.tmp_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.tmp_dir.mkdir(parents=True, exist_ok=True)
 
     def anonymize(self, dataset_path: str):
         """Anonymize a dataset to GDPR standards
         using a pipeline of named entity recognition, data transformations,
-        and synthetic data model training and generation"
+        and synthetic data model training and generation.
 
         Args:
             dataset_path (str): Path or URL to CSV
@@ -95,8 +96,7 @@ class Anonymizer:
             f"{reports.transform_report(self.run_report)}"
             f"{reports.synthesis_report(self.syn_report)}"
         )
-        with open(self.deid_report_path, "w") as fh:
-            fh.write(report)
+        self.deid_report_path.write_text(report)
 
     def _preprocess_data(self, ds: str) -> str:
         """Remove NaNs from input data before training model.
@@ -153,8 +153,7 @@ class Anonymizer:
 
     def transform(self):
         """Deidentify a dataset using Gretel's Transform APIs."""
-        with open(self.tx_config, "r") as stream:
-            config = yaml.safe_load(stream)
+        config = read_model_config(self.tx_config)
 
         if self._cache_ner_report.exists() and self._cache_run_report.exists():
             self.ner_report = pickle.load(open(self._cache_ner_report, "rb"))
@@ -178,11 +177,13 @@ class Anonymizer:
         """Train a synthetic data model on a dataset and use it to create an artificial
         version of a dataset with increased privacy guarantees.
         """
-        with open(self.sx_config, "r") as stream:
-            config = yaml.safe_load(stream)
+        config = read_model_config(self.sx_config)
 
-        config["models"][0]["actgan"]["generate"] = {"num_records": len(self.deid_df)}
-        config["models"][0]["actgan"]["data_source"] = str(self.training_path)
+        model_config = config["models"][0]
+        model_type = next(iter(model_config.keys()))
+
+        model_config[model_type]["generate"] = {"num_records": len(self.deid_df)}
+        model_config[model_type]["data_source"] = str(self.training_path)
 
         if self._cache_syn_report.exists():
             self.syn_report = pickle.load(open(self._cache_syn_report, "rb"))
