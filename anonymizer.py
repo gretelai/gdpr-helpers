@@ -50,13 +50,14 @@ class Anonymizer:
         self.project = create_or_get_unique_project(name=project_name)
         self.deid_report_path = None
         self.anonymized_path = None
+        self.deidentified_path = None
+        self.dataset_path = None
 
         self.training_path = Path(self.tmp_dir / "training_data.csv")
-        self.deid_path = Path(self.tmp_dir / "deidentified_data.csv")
         self.preview_path = Path(self.tmp_dir / "preview.csv")
         self._cache_ner_report = None
-        self._cache_run_report = None 
-        self._cache_syn_report = None 
+        self._cache_run_report = None
+        self._cache_syn_report = None
         self.dataset_path: Optional[Path] = None
         self.deid_df = None
         self.synthetic_df = None
@@ -81,6 +82,7 @@ class Anonymizer:
             dataset_path (str): Path or URL to CSV
         """
         print(f"Anonymizing '{dataset_path}'")
+        self.dataset_path = dataset_path
         self._preprocess_data(dataset_path)
         self.transform()
         self.synthesize()
@@ -91,14 +93,21 @@ class Anonymizer:
         print(f" -- Anonymization report stored to: {self.deid_report_path}")
 
     def _save_reports(self, output_path: Path):
-        """Save anonymization reports to a local file in markdown format
-        """
-        report = (
-            f"{reports.ner_report(self.ner_report)}"
-            f"{reports.transform_report(self.run_report)}"
-            f"{reports.synthesis_report(self.syn_report)}"
+        """Save anonymization reports to a local file in html format"""
+        r = (
+            f"<h1>{self.dataset_path}</h1>"
+            f"{reports.ner_report(self.ner_report)['html']}"
+            f"{reports.transform_report(self.run_report)['html']}"
+            f"{reports.synthesis_report(self.syn_report)['html']}"
+            "<h1>Results</h1>"
+            "<h3>Original sample</h3>"
+            f"{pd.read_csv(self.training_path).head(5).to_html()}"
+            "<h3>Transformed sample</h3>"
+            f"{pd.read_csv(self.deidentified_path).head(5).to_html()}"
+            "<h3>Synthetic sample</h3>"
+            f"{pd.read_csv(self.anonymized_path).head(5).to_html()}"
         )
-        self.deid_report_path.write_text(report)
+        self.deid_report_path.write_text(reports.style_html(r))
 
     def _preprocess_data(self, ds: str) -> str:
         """Remove NaNs from input data before training model.
@@ -114,8 +123,13 @@ class Anonymizer:
 
         # Setup output paths
         prefix = Path(ds).stem
-        self.deid_report_path = Path(self.output_dir / f"{prefix}-deidentification_report.md")
+        self.deid_report_path = Path(
+            self.output_dir / f"{prefix}-deidentification_report.html"
+        )
         self.anonymized_path = Path(self.output_dir / f"{prefix}-synthetic_data.csv")
+        self.deidentified_path = Path(
+            self.output_dir / f"{prefix}-transformed_data.csv"
+        )
         self._cache_ner_report = Path(self.tmp_dir / f"{prefix}-ner_report.pkl")
         self._cache_run_report = Path(self.tmp_dir / f"{prefix}-run_report.pkl")
         self._cache_syn_report = Path(self.tmp_dir / f"{prefix}-syn_report.pkl")
@@ -125,7 +139,10 @@ class Anonymizer:
         df = pd.read_csv(self.training_path)
         df.head(self.preview_recs).to_csv(self.preview_path, index=False)
         transform_train = self.project.create_model_obj(config, str(self.preview_path))
-        run = submit_docker_local(transform_train, output_dir=str(self.tmp_dir),)
+        run = submit_docker_local(
+            transform_train,
+            output_dir=str(self.tmp_dir),
+        )
         self.ner_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
 
         # Use model to transform records
@@ -139,7 +156,7 @@ class Anonymizer:
         )
         self.run_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
         self.deid_df = pd.read_csv(self.tmp_dir / "data.gz")
-        self.deid_df.to_csv(self.deid_path, index=False)
+        self.deid_df.to_csv(self.deidentified_path, index=False)
 
     def _transform_cloud(self, config: dict):
         """Gretel SaaS API."""
@@ -159,7 +176,7 @@ class Anonymizer:
         with open(rh.get_artifact_link("run_report_json")) as fh:
             self.run_report = json.loads(fh.read())
         self.deid_df = pd.read_csv(rh.get_artifact_link("data"), compression="gzip")
-        self.deid_df.to_csv(self.deid_path, index=False)
+        self.deid_df.to_csv(self.deidentified_path, index=False)
 
     def transform(self):
         """Deidentify a dataset using Gretel's Transform APIs."""
@@ -168,7 +185,7 @@ class Anonymizer:
         if self._cache_ner_report.exists() and self._cache_run_report.exists():
             self.ner_report = pickle.load(open(self._cache_ner_report, "rb"))
             self.run_report = pickle.load(open(self._cache_run_report, "rb"))
-            self.deid_df = pd.read_csv(self.deid_path)
+            self.deid_df = pd.read_csv(self.deidentified_path)
         else:
             # Initialize transform model
             if self.run_mode == "cloud":
@@ -178,10 +195,10 @@ class Anonymizer:
 
             pickle.dump(self.ner_report, open(self._cache_ner_report, "wb"))
             pickle.dump(self.run_report, open(self._cache_run_report, "wb"))
-            self.deid_df.to_csv(self.deid_path, index=False)
+            self.deid_df.to_csv(self.deidentified_path, index=False)
 
-        print(reports.ner_report(self.ner_report))
-        print(reports.transform_report(self.run_report))
+        print(reports.ner_report(self.ner_report)["md"])
+        print(reports.transform_report(self.run_report)["md"])
 
     def synthesize(self):
         """Train a synthetic data model on a dataset and use it to create an artificial
@@ -204,13 +221,12 @@ class Anonymizer:
             elif self.run_mode == "hybrid":
                 self._synthesize_hybrid(config=config)
 
-        print(reports.synthesis_report(self.syn_report))
+        print(reports.synthesis_report(self.syn_report)["md"])
 
     def _synthesize_cloud(self, config: dict):
-        """Gretel SaaS APIs.
-        """
+        """Gretel SaaS APIs."""
         model = self.project.create_model_obj(
-            model_config=config, data_source=str(self.deid_path)
+            model_config=config, data_source=str(self.deidentified_path)
         )
         model.submit_cloud()
         poll(model)

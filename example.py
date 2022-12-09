@@ -12,6 +12,7 @@ def main():
 
     for dataset_path in glob.glob(search_pattern):
         am.anonymize(dataset_path=dataset_path)
+        break
 
 if __name__ == "__main__":
     main()
