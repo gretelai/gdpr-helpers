@@ -21,9 +21,9 @@ class Anonymizer:
     """Automated model training and synthetic data generation tool
     Args:
         project_name: Gretel project name. Defaults to "gdpr-anonymized".
-        tx_config: Location of transform config. This can be a local path or URL that
+        transforms_config: Location of transform config. This can be a local path or URL that
             will be accessible when running.
-        sx_config: Location of synthetics config. This can be a local path or URL that
+        synthetics_config: Location of synthetics config. This can be a local path or URL that
             will be accessible when running.
         run_mode: One of ["cloud", "hybrid"].
         preview_recs: Number of records to use for transforms training.
@@ -32,8 +32,8 @@ class Anonymizer:
     def __init__(
         self,
         project_name: str = "gdpr-anonymized",
-        tx_config: str = files('gdpr_helpers.config').joinpath('transform_config.yaml'),
-        sx_config: str = files('gdpr_helpers.config').joinpath('synthetics_config.yaml'),
+        transforms_config: str = files('config').joinpath('transforms_config.yaml'),
+        synthetics_config: str = files('config').joinpath('synthetics_config.yaml'),
         run_mode: str = "cloud",
         preview_recs: int = PREVIEW_RECS,
         output_dir: str = "artifacts",
@@ -42,8 +42,8 @@ class Anonymizer:
         configure_session(api_key="prompt", cache="yes", validate=True)
 
         self.project_name = project_name
-        self.sx_config = sx_config
-        self.tx_config = tx_config
+        self.synthetics_config = synthetics_config
+        self.transforms_config = transforms_config
         self.run_mode = run_mode
         self.preview_recs = preview_recs
         self.output_dir = Path(output_dir)
@@ -190,7 +190,7 @@ class Anonymizer:
 
     def transform(self):
         """Deidentify a dataset using Gretel's Transform APIs."""
-        config = read_model_config(self.tx_config)
+        config = read_model_config(self.transforms_config)
 
         if self._cache_ner_report.exists() and self._cache_run_report.exists():
             self.ner_report = pickle.load(open(self._cache_ner_report, "rb"))
@@ -214,7 +214,7 @@ class Anonymizer:
         """Train a synthetic data model on a dataset and use it to create an artificial
         version of a dataset with increased privacy guarantees.
         """
-        config = read_model_config(self.sx_config)
+        config = read_model_config(self.synthetics_config)
 
         model_config = config["models"][0]
         model_type = next(iter(model_config.keys()))

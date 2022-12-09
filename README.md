@@ -10,14 +10,6 @@ cd gdpr-helpers
 python -m venv ./venv
 source venv/bin/activate
 
-# install dependencies
-pip install -r requirements.txt
+# install gdpr-helpers package
+pip install -U .
 ```
-
-## Comments/ideas
-
-- The output of the example script is a bit noisy, maybe we could redirect all the output coming from gretel client to a log file and only output stuff from the anonymizer?
-  - More advanced option - some kind of `tqdm` progress bar?
-- I think that specifying type in docstrings (e.g. `ds (str):`) is no longer necessary with type hints.
-- Package structure - if user is supposed to depend on this package and import it, we should put it inside of a module, e.g. `gretel_gdpr` (or `gdpr_helper`) and then put `anonymizer.py` and rest in there.
-- Abbreviations - I think, at least in the user facing names, I'd be willing to use full names, e.g. `transforms_config` vs `tx_config`, it's not much more typing and I think extra clarity is worth it.
