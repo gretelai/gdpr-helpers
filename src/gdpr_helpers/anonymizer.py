@@ -1,3 +1,4 @@
+from  importlib.resources import files
 import json
 import pickle
 from pathlib import Path
@@ -10,8 +11,8 @@ from gretel_client import configure_session, poll, submit_docker_local
 from gretel_client.projects import create_or_get_unique_project
 from gretel_client.projects.models import read_model_config
 
-import reports
-from helpers import quiet_poll
+from gdpr_helpers import reports
+from gdpr_helpers.helpers import quiet_poll
 
 PREVIEW_RECS = 100
 
@@ -31,8 +32,8 @@ class Anonymizer:
     def __init__(
         self,
         project_name: str = "gdpr-anonymized",
-        tx_config: str = "./config/transform_config.yaml",
-        sx_config: str = "./config/synthetics_config.yaml",
+        tx_config: str = files('gdpr_helpers.config').joinpath('transform_config.yaml'),
+        sx_config: str = files('gdpr_helpers.config').joinpath('synthetics_config.yaml'),
         run_mode: str = "cloud",
         preview_recs: int = PREVIEW_RECS,
         output_dir: str = "artifacts",

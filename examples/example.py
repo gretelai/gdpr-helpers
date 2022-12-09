@@ -1,5 +1,5 @@
 import glob
-from anonymizer import Anonymizer
+from gdpr_helpers.anonymizer import Anonymizer
 
 search_pattern = "data/*.csv"
 
@@ -7,8 +7,8 @@ search_pattern = "data/*.csv"
 def main():
     am = Anonymizer(
         run_mode="cloud",
-        tx_config="config/transform_config.yaml",
-        sx_config="config/synthetics_config.yaml",
+        #tx_config="config/transform_config.yaml",
+        #sx_config="config/synthetics_config.yaml",
     )
 
     for dataset_path in glob.glob(search_pattern):
