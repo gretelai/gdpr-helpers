@@ -33,10 +33,8 @@ class Anonymizer:
     def __init__(
         self,
         project_name: str = "gdpr-anonymized",
-        transforms_config: str = files(
-            'config').joinpath('transforms_config.yaml'),
-        synthetics_config: str = files(
-            'config').joinpath('synthetics_config.yaml'),
+        transforms_config: str = files("config").joinpath("transforms_config.yaml"),
+        synthetics_config: str = files("config").joinpath("synthetics_config.yaml"),
         run_mode: str = "cloud",
         preview_recs: int = PREVIEW_RECS,
         show_real_data: bool = True,
@@ -55,7 +53,7 @@ class Anonymizer:
         self.tmp_dir = Path(tmp_dir)
 
         self.project = create_or_get_unique_project(name=project_name)
-        self.deid_report_path = None
+        self.anonymization_report_path = None
         self.anonymized_path = None
         self.deidentified_path = None
         self.dataset_path = None
@@ -91,18 +89,20 @@ class Anonymizer:
         self._preprocess_data(dataset_path)
         self.transform()
         self.synthesize()
-        self._save_reports(self.deid_report_path)
+        self._save_reports(self.anonymization_report_path)
 
         print("Anonymization complete")
         print(f" -- Synthetic data stored to: {self.anonymized_path}")
-        print(f" -- Anonymization report stored to: {self.deid_report_path}")
+        print(f" -- Anonymization report stored to: {self.anonymization_report_path}")
 
     def _save_reports(self, output_path: Path):
         """Save anonymization reports to a local file in html format"""
-        compare_html = reports.compare(training_path=self.training_path,
-                                       deidentified_path=self.deidentified_path,
-                                       anonymized_path=self.anonymized_path,
-                                       show_real_data=self.show_real_data)
+        compare_html = reports.compare(
+            training_path=self.training_path,
+            deidentified_path=self.deidentified_path,
+            anonymized_path=self.anonymized_path,
+            show_real_data=self.show_real_data,
+        )
         r = (
             f"<h1>{self.dataset_path}</h1>"
             f"{reports.ner_report(self.ner_report)['html']}"
@@ -110,7 +110,7 @@ class Anonymizer:
             f"{reports.synthesis_report(self.syn_report)['html']}"
             f"{compare_html}"
         )
-        self.deid_report_path.write_text(reports.style_html(r))
+        self.anonymization_report_path.write_text(reports.style_html(r))
 
     def _preprocess_data(self, ds: str) -> str:
         """Remove NaNs from input data before training model.
@@ -128,31 +128,24 @@ class Anonymizer:
 
         # Setup output paths
         prefix = Path(ds).stem
-        self.deid_report_path = Path(
-            self.output_dir / f"{prefix}-deidentification_report.html"
+        self.anonymization_report_path = Path(
+            self.output_dir / f"{prefix}-anonymization_report.html"
         )
-        self.anonymized_path = Path(
-            self.output_dir / f"{prefix}-synthetic_data.csv")
+        self.anonymized_path = Path(self.output_dir / f"{prefix}-synthetic_data.csv")
         self.deidentified_path = Path(
             self.output_dir / f"{prefix}-transformed_data.csv"
         )
-        self._cache_ner_report = Path(
-            self.tmp_dir / f"{prefix}-ner_report.pkl")
-        self._cache_run_report = Path(
-            self.tmp_dir / f"{prefix}-run_report.pkl")
-        self._cache_syn_report = Path(
-            self.tmp_dir / f"{prefix}-syn_report.pkl")
+        self._cache_ner_report = Path(self.tmp_dir / f"{prefix}-ner_report.pkl")
+        self._cache_run_report = Path(self.tmp_dir / f"{prefix}-run_report.pkl")
+        self._cache_syn_report = Path(self.tmp_dir / f"{prefix}-syn_report.pkl")
 
     def _transform_hybrid(self, config: dict):
         """Gretel hybrid cloud API."""
         df = pd.read_csv(self.training_path)
         df.head(self.preview_recs).to_csv(self.preview_path, index=False)
-        transform_train = self.project.create_model_obj(
-            config, str(self.preview_path))
-        run = submit_docker_local(
-            transform_train, output_dir=str(self.tmp_dir),)
-        self.ner_report = json.loads(
-            open(self.tmp_dir / "report_json.json.gz").read())
+        transform_train = self.project.create_model_obj(config, str(self.preview_path))
+        run = submit_docker_local(transform_train, output_dir=str(self.tmp_dir),)
+        self.ner_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
 
         # Use model to transform records
         transform_go = transform_train.create_record_handler_obj(
@@ -163,8 +156,7 @@ class Anonymizer:
             model_path=str(self.tmp_dir / "model.tar.gz"),
             output_dir=str(self.tmp_dir),
         )
-        self.run_report = json.loads(
-            open(self.tmp_dir / "report_json.json.gz").read())
+        self.run_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
         self.deid_df = pd.read_csv(self.tmp_dir / "data.gz")
         self.deid_df.to_csv(self.deidentified_path, index=False)
 
@@ -185,8 +177,7 @@ class Anonymizer:
         quiet_poll(rh)
         with open(rh.get_artifact_link("run_report_json")) as fh:
             self.run_report = json.loads(fh.read())
-        self.deid_df = pd.read_csv(
-            rh.get_artifact_link("data"), compression="gzip")
+        self.deid_df = pd.read_csv(rh.get_artifact_link("data"), compression="gzip")
         self.deid_df.to_csv(self.deidentified_path, index=False)
 
     def transform(self):
@@ -220,8 +211,7 @@ class Anonymizer:
         model_config = config["models"][0]
         model_type = next(iter(model_config.keys()))
 
-        model_config[model_type]["generate"] = {
-            "num_records": len(self.deid_df)}
+        model_config[model_type]["generate"] = {"num_records": len(self.deid_df)}
         model_config[model_type]["data_source"] = str(self.training_path)
 
         if self._cache_syn_report.exists():
@@ -258,6 +248,5 @@ class Anonymizer:
             self.tmp_dir / "data_preview.gz", compression="gzip"
         )
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
-        self.syn_report = json.loads(
-            open(self.tmp_dir / "report_json.json.gz").read())
+        self.syn_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
         pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))

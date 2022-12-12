@@ -38,8 +38,7 @@ def quiet_poll(model):
                         pbar.set_postfix(logs[-1]["ctx"])
                     else:
                         status_msg = (
-                            logs[-1]["msg"] if len(logs[-1]
-                                                   ["msg"]) < 25 else status_msg
+                            logs[-1]["msg"] if len(logs[-1]["msg"]) < 25 else status_msg
                         )
 
             pbar.set_description(status_msg)

@@ -120,10 +120,10 @@ def synthesis_report(report: dict):
     return {"md": md_content, "html": html_content}
 
 
-def highlight_diff(data, color='lightgreen'):
-    highlight = 'background-color: {}'.format(color)
-    default = ''
-    data = data.fillna('')
+def highlight_diff(data, color="lightgreen"):
+    highlight = "background-color: {}".format(color)
+    default = ""
+    data = data.fillna("")
     if data[0] != data[1]:
         style = highlight
     else:
@@ -132,23 +132,30 @@ def highlight_diff(data, color='lightgreen'):
 
 
 def compare(
-    training_path,
-    deidentified_path,
-    anonymized_path,
-    show_real_data=True,
+    training_path, deidentified_path, anonymized_path, show_real_data=True,
 ):
     columns = ["training_data", "deidentified_data", "synthetic_data"]
     tdf = pd.read_csv(training_path).head(1)
     ddf = pd.read_csv(deidentified_path).head(1)
     sdf = pd.read_csv(anonymized_path).head(1)
     cdf = pd.concat([tdf.T, ddf.T, sdf.T], axis=1, keys=columns)
-    cdf = cdf.style.apply(highlight_diff, color='#D5F5E3', subset=['training_data', 'deidentified_data'], axis=1).apply(
-        highlight_diff, color='#ABEBC6', subset=['deidentified_data', 'synthetic_data'], axis=1)
-    
+    cdf = cdf.style.apply(
+        highlight_diff,
+        color="#D5F5E3",
+        subset=["training_data", "deidentified_data"],
+        axis=1,
+    ).apply(
+        highlight_diff,
+        color="#ABEBC6",
+        subset=["deidentified_data", "synthetic_data"],
+        axis=1,
+    )
+
     if not show_real_data:
         cdf = cdf.hide_columns(columns[:1])
-    report = ("<h1>Results</h1>" 
-              "<p>Highlight values that have been changed between each stage of the anonymization pipeline. Values that have been changed are highlighted in Green.</p>"
-              f"<div>{cdf.to_html(index = False)}</div><br>"
+    report = (
+        "<h1>Results</h1>"
+        "<p>Highlight values that have been changed between each stage of the anonymization pipeline. Values that have been changed are highlighted in Green.</p>"
+        f"<div>{cdf.to_html(index = False)}</div><br>"
     )
     return report
