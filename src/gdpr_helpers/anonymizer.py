@@ -1,4 +1,4 @@
-from  importlib.resources import files
+from importlib.resources import files
 import json
 import pickle
 from pathlib import Path
@@ -26,16 +26,20 @@ class Anonymizer:
         synthetics_config: Location of synthetics config. This can be a local path or URL that
             will be accessible when running.
         run_mode: One of ["cloud", "hybrid"].
+        show_real_data: Whether to preview real data in the report, which may contain PII. Defaults to `True`.
         preview_recs: Number of records to use for transforms training.
     """
 
     def __init__(
         self,
         project_name: str = "gdpr-anonymized",
-        transforms_config: str = files('config').joinpath('transforms_config.yaml'),
-        synthetics_config: str = files('config').joinpath('synthetics_config.yaml'),
+        transforms_config: str = files(
+            'config').joinpath('transforms_config.yaml'),
+        synthetics_config: str = files(
+            'config').joinpath('synthetics_config.yaml'),
         run_mode: str = "cloud",
         preview_recs: int = PREVIEW_RECS,
+        show_real_data: bool = True,
         output_dir: str = "artifacts",
         tmp_dir: str = "tmp",
     ):
@@ -46,6 +50,7 @@ class Anonymizer:
         self.transforms_config = transforms_config
         self.run_mode = run_mode
         self.preview_recs = preview_recs
+        self.show_real_data = show_real_data
         self.output_dir = Path(output_dir)
         self.tmp_dir = Path(tmp_dir)
 
@@ -67,10 +72,8 @@ class Anonymizer:
         self.run_report = {}
         self.syn_report = {}
 
-        assert self.run_mode in [
-            "cloud",
-            "hybrid",
-        ], "Error: run_mode param must be either 'cloud' or 'hybrid"
+        if self.run_mode not in ["cloud", "hybrid"]:
+            raise ValueError("run_mode must be either 'cloud' or 'hybrid'")
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -96,18 +99,16 @@ class Anonymizer:
 
     def _save_reports(self, output_path: Path):
         """Save anonymization reports to a local file in html format"""
+        compare_html = reports.compare(training_path=self.training_path,
+                                       deidentified_path=self.deidentified_path,
+                                       anonymized_path=self.anonymized_path,
+                                       show_real_data=self.show_real_data)
         r = (
             f"<h1>{self.dataset_path}</h1>"
             f"{reports.ner_report(self.ner_report)['html']}"
             f"{reports.transform_report(self.run_report)['html']}"
             f"{reports.synthesis_report(self.syn_report)['html']}"
-            "<h1>Results</h1>"
-            "<h3>Original sample</h3>"
-            f"{pd.read_csv(self.training_path).head(5).to_html()}"
-            "<h3>Transformed sample</h3>"
-            f"{pd.read_csv(self.deidentified_path).head(5).to_html()}"
-            "<h3>Synthetic sample</h3>"
-            f"{pd.read_csv(self.anonymized_path).head(5).to_html()}"
+            f"{compare_html}"
         )
         self.deid_report_path.write_text(reports.style_html(r))
 
