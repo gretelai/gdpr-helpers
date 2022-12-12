@@ -1,13 +1,13 @@
-from importlib.resources import files
 import json
 import pickle
 from pathlib import Path
+from pkg_resources import resource_filename
 from typing import Optional
 
 import pandas as pd
 from smart_open import open
 
-from gretel_client import configure_session, poll, submit_docker_local
+from gretel_client import configure_session, submit_docker_local
 from gretel_client.projects import create_or_get_unique_project
 from gretel_client.projects.models import read_model_config
 
@@ -33,8 +33,8 @@ class Anonymizer:
     def __init__(
         self,
         project_name: str = "gdpr-anonymized",
-        transforms_config: str = files("config").joinpath("transforms_config.yaml"),
-        synthetics_config: str = files("config").joinpath("synthetics_config.yaml"),
+        transforms_config: str = resource_filename(__name__, '../config/transforms_config.yaml'),
+        synthetics_config: str = resource_filename(__name__, '../config/synthetics_config.yaml'),
         run_mode: str = "cloud",
         preview_recs: int = PREVIEW_RECS,
         show_real_data: bool = True,
