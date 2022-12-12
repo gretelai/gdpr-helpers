@@ -1,15 +1,15 @@
 import json
 import pickle
 from pathlib import Path
-from pkg_resources import resource_filename
+from shutil import rmtree
 from typing import Optional
 
 import pandas as pd
-from smart_open import open
-
 from gretel_client import configure_session, submit_docker_local
 from gretel_client.projects import create_or_get_unique_project
 from gretel_client.projects.models import read_model_config
+from pkg_resources import resource_filename
+from smart_open import open
 
 from gdpr_helpers import reports
 from gdpr_helpers.helpers import quiet_poll
@@ -27,21 +27,28 @@ class Anonymizer:
             will be accessible when running.
         run_mode: One of ["cloud", "hybrid"].
         show_real_data: Whether to preview real data in the report, which may contain PII. Defaults to `True`.
-        preview_recs: Number of records to use for transforms training.
+        output_dir: Directory to store anonymized data and reports to. Defaults to `artifacts`.
+        preview_recs: Number of records to use for transforms training. Defaults to 100.
+        overwrite: Set to `True` to automatically overwrite previous anonymization checkpoints. Defaults to `False`.
     """
 
     def __init__(
         self,
         project_name: str = "gdpr-anonymized",
-        transforms_config: str = resource_filename(__name__, '../config/transforms_config.yaml'),
-        synthetics_config: str = resource_filename(__name__, '../config/synthetics_config.yaml'),
+        transforms_config: str = resource_filename(
+            __name__, "../config/transforms_config.yaml"
+        ),
+        synthetics_config: str = resource_filename(
+            __name__, "../config/synthetics_config.yaml"
+        ),
         run_mode: str = "cloud",
         preview_recs: int = PREVIEW_RECS,
         show_real_data: bool = True,
         output_dir: str = "artifacts",
         tmp_dir: str = "tmp",
+        overwrite: bool = False,
+        endpoint: str = "https://api.gretel.cloud",
     ):
-        configure_session(api_key="prompt", cache="yes", validate=True)
 
         self.project_name = project_name
         self.synthetics_config = synthetics_config
@@ -51,13 +58,10 @@ class Anonymizer:
         self.show_real_data = show_real_data
         self.output_dir = Path(output_dir)
         self.tmp_dir = Path(tmp_dir)
-
-        self.project = create_or_get_unique_project(name=project_name)
         self.anonymization_report_path = None
         self.anonymized_path = None
         self.deidentified_path = None
         self.dataset_path = None
-
         self.training_path = Path(self.tmp_dir / "training_data.csv")
         self.preview_path = Path(self.tmp_dir / "preview.csv")
         self._cache_ner_report = None
@@ -70,9 +74,17 @@ class Anonymizer:
         self.run_report = {}
         self.syn_report = {}
 
+        configure_session(
+            api_key="prompt", cache="yes", validate=True, endpoint=endpoint
+        )
+        self.project = create_or_get_unique_project(name=project_name)
+        print(f"Follow along with model training at: {self.project.get_console_url()}")
+
         if self.run_mode not in ["cloud", "hybrid"]:
             raise ValueError("run_mode must be either 'cloud' or 'hybrid'")
-
+        if overwrite:
+            if self.tmp_dir.exists() and self.tmp_dir.is_dir():
+                rmtree(self.tmp_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
 
