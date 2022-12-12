@@ -3,3 +3,7 @@
 *.gz
 artifacts/
 tmp/
+.eggs/
+src/gdpr_helpers.egg-info/
+build/
+dist/
