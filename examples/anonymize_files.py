@@ -9,7 +9,7 @@ def main():
     am = Anonymizer(
         project_name="gdpr-workflow", 
         run_mode="cloud", 
-        overwrite=False
+        overwrite=False,
         )
 
     for dataset_path in glob.glob(search_pattern):

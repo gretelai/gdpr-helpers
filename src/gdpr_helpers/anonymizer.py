@@ -47,7 +47,7 @@ class Anonymizer:
         output_dir: str = "artifacts",
         tmp_dir: str = "tmp",
         overwrite: bool = False,
-        endpoint: str = "https://api.gretel.cloud",
+        endpoint: str = None
     ):
 
         self.project_name = project_name
@@ -74,9 +74,11 @@ class Anonymizer:
         self.run_report = {}
         self.syn_report = {}
 
-        configure_session(
-            api_key="prompt", cache="yes", validate=True, endpoint=endpoint
-        )
+        if endpoint:
+            configure_session(api_key="prompt", cache="yes", validate=True, endpoint=endpoint)
+        else:
+            configure_session(api_key="prompt", cache="yes", validate=True)
+
         self.project = create_or_get_unique_project(name=project_name)
         print(f"Follow along with model training at: {self.project.get_console_url()}")
 
