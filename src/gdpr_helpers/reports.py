@@ -156,6 +156,6 @@ def compare(
     report = (
         "<h1>Results</h1>"
         "<p>Highlight values that have been changed between each stage of the anonymization pipeline. Values that have been changed are highlighted in Green.</p>"
-        f"<div>{cdf.to_html(index = False)}</div><br>"
+        f"<div>{cdf.to_html()}</div><br>"
     )
     return report

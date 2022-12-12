@@ -1,6 +1,7 @@
-from time import sleep
-from tqdm import tqdm
 from pprint import pprint
+from time import sleep
+
+from tqdm import tqdm
 
 
 def quiet_poll(model):
