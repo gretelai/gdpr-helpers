@@ -96,14 +96,21 @@ def transform_report(report: dict):
 
 def synthesis_report(report: dict):
     """Save a markdown-format report of data synthesis on a dataset."""
+    print(report.keys())
     summary = pd.DataFrame(report["summary"])
+    summary = summary[summary.field != 'privacy_protection_level']
+
     ppl = pd.DataFrame.from_dict(
         report["privacy_protection_level"], orient="index", columns=["value"]
     )
+    ppl.drop(['grade', 'raw_score', 'score'], inplace=True)
 
     md_content = (
         "\n\nSynthesis finished.\n"
         f"Lines memorized: {report['memorized_lines']}\n\n"
+        f"Model training time: {report['total_time_seconds']} seconds\n\n"
+        f"Job status: {report['job_status']}\n\n"
+        f"Job type: {report['job_type']}\n\n"
         "Privacy report\n"
         f"{ppl.to_markdown(index = True)}\n\n"
         "Accuracy report\n"
@@ -112,6 +119,9 @@ def synthesis_report(report: dict):
     html_content = (
         "<h2>Synthesis</h2>"
         f"Lines memorized: {report['memorized_lines']}<br>"
+        f"Model training time: {report['total_time_seconds']} seconds<br>"
+        f"Job status: {report['job_status']}<br>"
+        f"Job type: {report['job_type']}<br>"
         "<h3>Privacy report</h3>"
         f"<div>{ppl.to_html(index = True)}</div><br>"
         "<h3>Accuracy report</h3>"

@@ -252,6 +252,7 @@ class Anonymizer:
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         with open(model.get_artifact_link("report_json")) as fh:
             self.syn_report = json.loads(fh.read())
+            self.syn_report.update(model._data['billing_data'])
             pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
 
     def _synthesize_hybrid(self, config: dict):
@@ -263,4 +264,5 @@ class Anonymizer:
         )
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         self.syn_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
+        self.syn_report.update(model._data['billing_data'])
         pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
