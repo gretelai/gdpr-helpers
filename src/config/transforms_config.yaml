@@ -22,25 +22,25 @@ models:
             - name: city
               conditions:
                 field_name_regex:
-                  - '(?i)^((city|metropolitan|metro)[\ ,-,_,\.]*(name|area)|city|cities|town|township|capital|municipality|city\/town|town\/city)[s,es,\(s\),:,-]*$'
+                  - '(?i)^((city|metropolitan|metro)[\ -_\.]*(name|area)|city|cities|town|township|capital|municipality|city\/town|town\/city)[ies\(\):-]*$'
               transforms:
                 - type: passthrough
             - name: state
               conditions:
                 field_name_regex:
-                  - '(?i)^(state|province|state\/province|province\/state)[s,es,\(s\),:,-]*$'
+                  - '(?i)^(state|province|state\/province|province\/state)[ies\(\):-]*$'
               transforms:
                 - type: passthrough
             - name: country
               conditions:
                 field_name_regex:
-                  - '(?i)^(country[\/\ ,-,_,\.]*(name|region|territory)|country|countries)[s,\(s\),:,-]*$'
+                  - '(?i)^(country[\/\ -_\.]*(name|region|territory)|country|countries)[ies\(\):-]*$'
               transforms:
                 - type: passthrough            
             - name: last_name
               conditions:
                 field_name_regex:
-                  - '(?i)^((last|family)[\ ,-,_,\.]*name|lname|surname|last|byname)[s,\(s\),:,-]*$'
+                  - '(?i)^((last|family)[\ -_\.]*name|lname|surname|last|byname)[ies\(\):-]*$'
               transforms:
                 - type: fake
                   attrs:
@@ -48,7 +48,7 @@ models:
             - name: middle_name
               conditions:
                 field_name_regex:
-                  - '(?i)^((middle)[\ ,-,_,\.]*name|mname|middle|surname)[s,\(s\),:,-]*$'
+                  - '(?i)^((middle)[\ -_\.]*name|mname|middle|surname)[ies\(\):-]*$'
               transforms:
                 - type: fake
                   attrs:
@@ -56,7 +56,7 @@ models:
             - name: first_name
               conditions:
                 field_name_regex:
-                  - '(?i)^((first|nick|given|middle)[\ ,-,_,\.]*name|fname|given|first|middle)[s,\(s\),:,-]*$'
+                  - '(?i)^((first|nick|given|middle)[\ -_\.]*name|fname|given|first|middle)[ies\(\):-]*$'
               transforms:
                 - type: fake
                   attrs:
@@ -64,7 +64,7 @@ models:
             - name: street_address
               conditions:
                 field_name_regex:
-                  - '(?i)^((street|home|business)[\,-,_,\.]*address|street|address|addressline|headquarters|home|residence)[1]{0,1}[s,es,\(s\),:,-]*$'
+                  - '(?i)^((street|home|business)[\-_\.]*address|street|address|addressline|headquarters|home|residence)[1]{0,1}[ies\(\):-]*$'
               transforms:
                 - type: fake
                   attrs:
@@ -72,7 +72,7 @@ models:
             - name: secondary_address
               conditions:
                 field_name_regex:
-                  - '(?i)^((street|home|business)[\,-,_,\.]*address|street|address|addressline|headquarters|home|residence)2[s,es,\(s\),:,-]*$'
+                  - '(?i)^((street|home|business)[\-_\.]*address|street|address|addressline|headquarters|home|residence)2[ies\(\):-]*$'
               transforms:
                 - type: hash
                   attrs:
