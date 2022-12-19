@@ -44,7 +44,7 @@ models:
               transforms:
                 - type: fake
                   attrs:
-                    method: name_nonbinary
+                    method: last_name_nonbinary
             - name: middle_name
               conditions:
                 field_name_regex:
@@ -52,7 +52,7 @@ models:
               transforms:
                 - type: fake
                   attrs:
-                    method: name_nonbinary
+                    method: first_name_nonbinary
             - name: first_name
               conditions:
                 field_name_regex:
@@ -76,7 +76,7 @@ models:
               transforms:
                 - type: hash
                   attrs:
-                    length: 2 
+                    length: 8 
             - name: birth_date
               conditions:
                 field_label:
