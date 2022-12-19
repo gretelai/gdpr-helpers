@@ -3,7 +3,7 @@ import pandas as pd
 
 def get_header() -> str:
     header = (
-        "This report details the pipeline of steps taken to anonymize data to meet or "
+        "This report details the pipeline of steps taken to anonymize this dataset to meet or "
         "exceed GDPR standards. While this helper automates many processes of data anonymization, "
         "these reports should still be reviewed to ensure compliance. The data transformation "
         "and synthesis policies used by this helper are meant to provide a baseline and can be "

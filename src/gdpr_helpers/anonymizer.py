@@ -120,7 +120,7 @@ class Anonymizer:
             show_real_data=self.show_real_data,
         )
         r = (
-            f"<h1>Data: {self.dataset_path}</h1>"
+            f"<h1>{self.dataset_path}</h1>"
             f"<p>{reports.get_header()}</p>"
             f"{reports.ner_report(self.ner_report)['html']}"
             f"{reports.transform_report(self.run_report)['html']}"
