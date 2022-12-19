@@ -11,7 +11,7 @@ python -m venv ./venv
 source venv/bin/activate
 
 # install gdpr-helpers package
-pip install -U .
+pip install -U -e .
 ```
 
 ## 2. Add your [Gretel API](https://console.gretel.cloud) key via the Gretel CLI.
