@@ -47,7 +47,7 @@ class Anonymizer:
         output_dir: str = "artifacts",
         tmp_dir: str = "tmp",
         overwrite: bool = False,
-        endpoint: str = None
+        endpoint: str = None,
     ):
 
         self.project_name = project_name
@@ -75,7 +75,9 @@ class Anonymizer:
         self.syn_report = {}
 
         if endpoint:
-            configure_session(api_key="prompt", cache="yes", validate=True, endpoint=endpoint)
+            configure_session(
+                api_key="prompt", cache="yes", validate=True, endpoint=endpoint
+            )
         else:
             configure_session(api_key="prompt", cache="yes", validate=True)
 
@@ -119,6 +121,7 @@ class Anonymizer:
         )
         r = (
             f"<h1>{self.dataset_path}</h1>"
+            f"<p>{reports.get_header()}</p>"
             f"{reports.ner_report(self.ner_report)['html']}"
             f"{reports.transform_report(self.run_report)['html']}"
             f"{reports.synthesis_report(self.syn_report)['html']}"
@@ -226,7 +229,7 @@ class Anonymizer:
         model_type = next(iter(model_config.keys()))
 
         model_config[model_type]["generate"] = {"num_records": len(self.deid_df)}
-        model_config[model_type]["data_source"] = str(self.training_path)
+        model_config[model_type]["data_source"] = str(self.deidentified_path)
 
         if self._cache_syn_report.exists():
             self.syn_report = pickle.load(open(self._cache_syn_report, "rb"))
@@ -252,15 +255,19 @@ class Anonymizer:
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         with open(model.get_artifact_link("report_json")) as fh:
             self.syn_report = json.loads(fh.read())
+            self.syn_report.update(model._data["billing_data"])
             pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
 
     def _synthesize_hybrid(self, config: dict):
         """Gretel Hybrid Cloud APIs"""
-        model = self.project.create_model_obj(model_config=config)
+        model = self.project.create_model_obj(
+            model_config=config, data_source=str(self.deidentified_path)
+        )
         run = submit_docker_local(model, output_dir=str(self.tmp_dir))
         self.synthetic_df = pd.read_csv(
             self.tmp_dir / "data_preview.gz", compression="gzip"
         )
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         self.syn_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
+        self.syn_report.update(model._data["billing_data"])
         pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
