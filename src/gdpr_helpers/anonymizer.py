@@ -47,7 +47,7 @@ class Anonymizer:
         output_dir: str = "artifacts",
         tmp_dir: str = "tmp",
         overwrite: bool = False,
-        endpoint: str = None
+        endpoint: str = None,
     ):
 
         self.project_name = project_name
@@ -75,7 +75,9 @@ class Anonymizer:
         self.syn_report = {}
 
         if endpoint:
-            configure_session(api_key="prompt", cache="yes", validate=True, endpoint=endpoint)
+            configure_session(
+                api_key="prompt", cache="yes", validate=True, endpoint=endpoint
+            )
         else:
             configure_session(api_key="prompt", cache="yes", validate=True)
 
@@ -118,7 +120,8 @@ class Anonymizer:
             show_real_data=self.show_real_data,
         )
         r = (
-            f"<h1>{self.dataset_path}</h1>"
+            f"<h1>Data: {self.dataset_path}</h1>"
+            f"<p>{reports.get_header()}</p>"
             f"{reports.ner_report(self.ner_report)['html']}"
             f"{reports.transform_report(self.run_report)['html']}"
             f"{reports.synthesis_report(self.syn_report)['html']}"
@@ -252,7 +255,7 @@ class Anonymizer:
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         with open(model.get_artifact_link("report_json")) as fh:
             self.syn_report = json.loads(fh.read())
-            self.syn_report.update(model._data['billing_data'])
+            self.syn_report.update(model._data["billing_data"])
             pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
 
     def _synthesize_hybrid(self, config: dict):
@@ -266,5 +269,5 @@ class Anonymizer:
         )
         self.synthetic_df.to_csv(self.anonymized_path, index=False)
         self.syn_report = json.loads(open(self.tmp_dir / "report_json.json.gz").read())
-        self.syn_report.update(model._data['billing_data'])
+        self.syn_report.update(model._data["billing_data"])
         pickle.dump(self.syn_report, open(self._cache_syn_report, "wb"))
