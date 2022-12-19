@@ -6,7 +6,7 @@ models:
   - actgan:
         data_source: __tmp__
         params:
-            epochs: 100 # auto
+            epochs: auto
             generator_dim: [1024, 1024]
             discriminator_dim: [1024, 1024]
             generator_lr: 0.0001
