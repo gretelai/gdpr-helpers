@@ -25,7 +25,7 @@ gretel configure
 
 ## 3. Anonymize a set of sample files
 
-Use the example function to anonymize all datasets in a directory.
+Use the example function to anonymize all datasets in a directory. Edit ./examples/anonymize_files.py to anonymize your own datasets versus the provided samples.
 
 ```bash
 python -m examples.anonymize_files
