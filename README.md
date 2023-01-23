@@ -4,7 +4,7 @@
 
 ```shell
 # checkout the repo
-git clone git@github.com:gretelai/gdpr-helpers.git
+git clone https://github.com/gretelai/gdpr-helpers.git
 
 # create venv
 cd gdpr-helpers
